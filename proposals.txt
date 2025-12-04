@@ -1,2 +1,4 @@
-Proposal,85c87cca-dc5c-45ce-b4db-093667476dc0,12321,palaro,123,500.0,10,50.0,Approved
-Proposal,32f14381-1a88-4c2c-9997-0f97a0bef0f8,12321,ccs days,3123,500.0,10,50.0,Approved
+Proposal,fe193e0c-8979-407a-9f3e-db15ec93b717,12323,palaro,131,5000.0,50,100.0,Approved
+Proposal,73f9c13d-9e84-42d8-81d0-f54dd46d5ae7,12323,ccs days,12312,10000.0,50,200.0,Approved
+Proposal,7b51fc7b-b741-407c-9952-ce81a28511bb,12323,year end,party,10000.0,100,100.0,Approved
+Proposal,ac62da0d-b4aa-42cc-82b2-48186d639d0d,12323,Christmas party,213,15000.0,50,300.0,Pending

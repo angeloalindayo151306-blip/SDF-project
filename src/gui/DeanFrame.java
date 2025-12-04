@@ -27,7 +27,7 @@ public class DeanFrame extends JFrame {
 
         // TABLE MODEL — FIRST COLUMN IS CHECKBOX (ONLY FOR PENDING)
         tableModel = new DefaultTableModel(
-                new Object[]{"Approve", "ID", "Title", "Amount", "Status", "Submitter"}, 0
+                new Object[]{"Approve", "ID", "Title", "Total Amount", "Status", "Submitter"}, 0
         ) {
             @Override
             public Class<?> getColumnClass(int columnIndex) {
@@ -36,8 +36,10 @@ public class DeanFrame extends JFrame {
 
             @Override
             public boolean isCellEditable(int row, int col) {
-                // Checkbox only editable if Pending
+                // Checkbox only editable if Pending and actually has Boolean value
                 if (col == 0) {
+                    Object v = getValueAt(row, 0);
+                    if (!(v instanceof Boolean)) return false;
                     String status = (String) getValueAt(row, 4);
                     return status.equalsIgnoreCase("Pending");
                 }
@@ -57,20 +59,23 @@ public class DeanFrame extends JFrame {
 
         // BOTTOM BUTTONS
         JPanel buttons = new JPanel();
-        JButton approveBtn = new JButton("Approve Selected");
-        JButton rejectBtn = new JButton("Reject Selected");
+        JButton approveBtn   = new JButton("Approve Selected");
+        JButton rejectBtn    = new JButton("Reject Selected");
         JButton viewPayments = new JButton("View Payments Table");
-        JButton logout = new JButton("Logout");
+        JButton budgetBtn    = new JButton("Budget Monitor"); // opens BudgetMonitorFrame
+        JButton logout       = new JButton("Logout");
 
         buttons.add(approveBtn);
         buttons.add(rejectBtn);
         buttons.add(viewPayments);
+        buttons.add(budgetBtn);
         buttons.add(logout);
         add(buttons, BorderLayout.SOUTH);
 
         approveBtn.addActionListener(e -> changeProposalStatus(true));
         rejectBtn.addActionListener(e -> changeProposalStatus(false));
         viewPayments.addActionListener(e -> showPaymentsTable());
+        budgetBtn.addActionListener(e -> new BudgetMonitorFrame().setVisible(true));
         logout.addActionListener(e -> {
             new WelcomeFrame().setVisible(true);
             dispose();
@@ -79,7 +84,7 @@ public class DeanFrame extends JFrame {
         loadProposalsToTable();
     }
 
-    // Renderer for the Approve column: show checkbox only when status is Pending
+    // Renderer for the "Approve" column: show checkbox only when status is Pending
     private class ApproveColumnRenderer extends JCheckBox implements TableCellRenderer {
         private final JLabel empty = new JLabel();
 
@@ -93,9 +98,9 @@ public class DeanFrame extends JFrame {
                 JTable table, Object value, boolean isSelected,
                 boolean hasFocus, int row, int column) {
 
-            String status = (String) table.getValueAt(row, 4); // Status column
+            String status = (String) table.getValueAt(row, 4); // col 4 = Status
 
-            if ("Pending".equalsIgnoreCase(status)) {
+            if ("Pending".equalsIgnoreCase(status) && value instanceof Boolean) {
                 setSelected(Boolean.TRUE.equals(value));
                 if (isSelected) {
                     setBackground(table.getSelectionBackground());
@@ -121,6 +126,7 @@ public class DeanFrame extends JFrame {
 
     // ===========================================================
     // LOAD PROPOSALS — only PENDING shows checkbox
+    // Amount = FULL event amount (same as Officer & BudgetMonitor)
     // ===========================================================
     private void loadProposalsToTable() {
         tableModel.setRowCount(0);
@@ -136,7 +142,7 @@ public class DeanFrame extends JFrame {
                     checkValue,
                     p.getProposalId(),
                     p.getTitle(),
-                    String.format("₱%.2f", p.getAmount()),
+                    String.format("₱%.2f", p.getAmount()), // FULL total amount
                     p.getStatus(),
                     p.getStudentId()
             });
@@ -183,13 +189,13 @@ public class DeanFrame extends JFrame {
     private void showPaymentsTable() {
 
         String[] cols = {
-                "Student Name",
-                "Year Level",
-                "Student ID",
-                "Event",
-                "Amount",
-                "Officer / Submitter",
-                "Date"
+            "Student Name",
+            "Year Level",
+            "Student ID",
+            "Event",
+            "Amount",
+            "Officer / Submitter",
+            "Date"
         };
 
         Object[][] data = new Object[LocalDatabase.payments.size()][7];

@@ -30,7 +30,7 @@ public class StudentFrame extends JFrame {
 
         // TABLE MODEL WITH CHECKBOX + STATUS
         model = new DefaultTableModel(
-                new Object[]{"Pay", "ID", "Title", "Amount", "Status", "Submitter"}, 0
+                new Object[]{"Pay", "ID", "Title", "Amount (Remaining)", "Status", "Submitter"}, 0
         ) {
             @Override
             public boolean isCellEditable(int r, int c) {
@@ -110,29 +110,16 @@ public class StudentFrame extends JFrame {
         }
     }
 
-    // ====================== LOAD APPROVED EVENTS =======================
-    private void loadApprovedEvents() {
-        model.setRowCount(0);
+    // ====================== HELPERS (per-student logic) =======================
 
-        for (Proposal p : LocalDatabase.proposals) {
-            if (!p.getStatus().equalsIgnoreCase("Approved")) continue;
-
-            boolean fullyPaid = isFullyPaidByStudent(p);
-            Object payCell = fullyPaid ? null : Boolean.FALSE;
-            String status = getPaymentStatus(p);
-            double remaining = getRemainingForProposal(p);
-
-            model.addRow(new Object[]{
-                    payCell,
-                    p.getProposalId(),
-                    p.getTitle(),
-                    "₱" + String.format("%.2f", remaining),
-                    status,
-                    p.getStudentId()
-            });
-        }
+    // Per-student share for this proposal = total / numberOfStudents
+    private double getPerStudentAmount(Proposal proposal) {
+        int n = proposal.getNumberOfStudents();
+        if (n <= 0) return proposal.getAmount();  // fallback
+        return proposal.getAmount() / n;
     }
 
+    // total paid by THIS student for this proposal
     private double getTotalPaidForProposal(Proposal proposal) {
         double totalPaid = 0.0;
         for (Payment pay : LocalDatabase.payments) {
@@ -144,8 +131,9 @@ public class StudentFrame extends JFrame {
         return totalPaid;
     }
 
+    // remaining balance for THIS student = per-student - totalPaid
     private double getRemainingForProposal(Proposal proposal) {
-        double remaining = proposal.getAmount() - getTotalPaidForProposal(proposal);
+        double remaining = getPerStudentAmount(proposal) - getTotalPaidForProposal(proposal);
         return remaining < 0 ? 0.0 : remaining;
     }
 
@@ -154,15 +142,38 @@ public class StudentFrame extends JFrame {
     }
 
     private String getPaymentStatus(Proposal proposal) {
+        double perStudent = getPerStudentAmount(proposal);
         double totalPaid = getTotalPaidForProposal(proposal);
-        double amount = proposal.getAmount();
 
         if (totalPaid <= 1e-6) {
             return "Unpaid";
-        } else if (totalPaid + 1e-6 >= amount) {
+        } else if (totalPaid + 1e-6 >= perStudent) {
             return "Paid in Full";
         } else {
-            return String.format("Partial (₱%.2f / ₱%.2f)", totalPaid, amount);
+            return String.format("Partial (₱%.2f / ₱%.2f)", totalPaid, perStudent);
+        }
+    }
+
+    // ====================== LOAD APPROVED EVENTS ============================
+    private void loadApprovedEvents() {
+        model.setRowCount(0);
+
+        for (Proposal p : LocalDatabase.proposals) {
+            if (!p.getStatus().equalsIgnoreCase("Approved")) continue;
+
+            boolean fullyPaid = isFullyPaidByStudent(p);
+            Object payCell = fullyPaid ? null : Boolean.FALSE;
+            String status = getPaymentStatus(p);
+            double remaining = getRemainingForProposal(p); // per-student remaining
+
+            model.addRow(new Object[]{
+                    payCell,
+                    p.getProposalId(),
+                    p.getTitle(),
+                    "₱" + String.format("%.2f", remaining),
+                    status,
+                    p.getStudentId()
+            });
         }
     }
 
@@ -207,8 +218,8 @@ public class StudentFrame extends JFrame {
         }
 
         if (successCount > 0) {
-            loadApprovedEvents(); // update status/amount/checkboxes
-            new ReceiptFrame(paymentsMade).setVisible(true); // ONE receipt for all
+            loadApprovedEvents(); // update remaining & status
+            new ReceiptFrame(paymentsMade).setVisible(true); // one receipt for all
             JOptionPane.showMessageDialog(this,
                     "Payments processed for " + successCount + " event(s).");
         }
@@ -216,7 +227,7 @@ public class StudentFrame extends JFrame {
 
     // Returns the Payment made, or null if cancelled/invalid
     private Payment processPaymentForProposal(Proposal chosen) {
-        double remaining = getRemainingForProposal(chosen);
+        double remaining = getRemainingForProposal(chosen); // per-student remaining
 
         if (remaining <= 1e-6) {
             JOptionPane.showMessageDialog(this, "This event is already fully paid.");
@@ -232,6 +243,7 @@ public class StudentFrame extends JFrame {
         int option = JOptionPane.showOptionDialog(
                 this,
                 "Event: " + chosen.getTitle()
+                        + "\nPer-student total: ₱" + String.format("%.2f", getPerStudentAmount(chosen))
                         + "\nRemaining balance: ₱" + String.format("%.2f", remaining),
                 "Payment",
                 JOptionPane.DEFAULT_OPTION,

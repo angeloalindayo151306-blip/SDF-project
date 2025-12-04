@@ -21,14 +21,15 @@ public class OfficerFrame extends JFrame {
         setResizable(true);
         setLayout(new BorderLayout());
 
-        JLabel header = new JLabel("Officer Dashboard - " + officer.getPosition() + " " + officer.getFullName(),
+        JLabel header = new JLabel(
+                "Officer Dashboard - " + officer.getPosition() + " " + officer.getFullName(),
                 SwingConstants.CENTER);
         header.setFont(new Font("Arial", Font.BOLD, 18));
         add(header, BorderLayout.NORTH);
 
-        // Columns: small ID column, Title, Per-student amount, Status
+        // Columns: small ID column, Title, TOTAL event amount, Status
         model = new DefaultTableModel(
-                new Object[]{"ID", "Title", "Per Student Amount", "Status"}, 0
+                new Object[]{"ID", "Title", "Total Amount", "Status"}, 0
         ) {
             @Override
             public boolean isCellEditable(int r, int c) { return false; }
@@ -36,26 +37,32 @@ public class OfficerFrame extends JFrame {
 
         table = new JTable(model);
         table.setRowHeight(25);
-        // make ID visually small
         if (table.getColumnModel().getColumnCount() > 0) {
-            table.getColumnModel().getColumn(0).setPreferredWidth(80);
+            table.getColumnModel().getColumn(0).setPreferredWidth(80); // ID column smaller
         }
         add(new JScrollPane(table), BorderLayout.CENTER);
 
+        // Bottom buttons
         JPanel bottom = new JPanel();
-        JButton newProp = new JButton("Create Proposal");
+        JButton newProp      = new JButton("Create Proposal");
         JButton viewPayments = new JButton("View All Payments");
-        JButton logout = new JButton("Logout");
+        JButton budgetBtn    = new JButton("Budget Monitor");
+        JButton logout       = new JButton("Logout");
 
         bottom.add(newProp);
         bottom.add(viewPayments);
+        bottom.add(budgetBtn);
         bottom.add(logout);
 
         add(bottom, BorderLayout.SOUTH);
 
         newProp.addActionListener(e -> createProposal());
         viewPayments.addActionListener(e -> showPayments());
-        logout.addActionListener(e -> { new WelcomeFrame().setVisible(true); dispose(); });
+        budgetBtn.addActionListener(e -> new BudgetMonitorFrame().setVisible(true));
+        logout.addActionListener(e -> {
+            new WelcomeFrame().setVisible(true);
+            dispose();
+        });
 
         loadProposals();
     }
@@ -69,7 +76,7 @@ public class OfficerFrame extends JFrame {
                 model.addRow(new Object[]{
                         p.getProposalId(),
                         p.getTitle(),
-                        "₱" + String.format("%.2f", p.getAmount()), // amount stored is per-student (per your workflow)
+                        "₱" + String.format("%.2f", p.getAmount()), // FULL event amount
                         p.getStatus()
                 });
             }
@@ -85,7 +92,7 @@ public class OfficerFrame extends JFrame {
         int ok = JOptionPane.showConfirmDialog(this, new Object[]{
                 "Title:", title,
                 "Description:", new JScrollPane(desc),
-                "Total Amount (₱):", totalAmount,
+                "Total Amount for the event (₱):", totalAmount,
                 "Number of students who will pay:", numStudents
         }, "New Proposal", JOptionPane.OK_CANCEL_OPTION);
 
@@ -93,28 +100,30 @@ public class OfficerFrame extends JFrame {
             try {
                 double total = Double.parseDouble(totalAmount.getText().trim());
                 int students = Integer.parseInt(numStudents.getText().trim());
-                if (students <= 0) {
-                    JOptionPane.showMessageDialog(this, "Number of students must be positive.");
+                if (students <= 0 || total <= 0) {
+                    JOptionPane.showMessageDialog(this, "Amount and number of students must be positive.");
                     return;
                 }
 
-                double perStudent = total / students;
-                String id = UUID.randomUUID().toString(); // or use short id generator if you have one
+                String id = UUID.randomUUID().toString();
 
-                // NOTE: This matches your Proposal constructor:
-                // Proposal(String proposalId, String studentId, String title, String description, double amount, int numberOfStudents, String status)
+                // Store FULL amount; numberOfStudents used later to compute per-student share
+                // Proposal(String proposalId, String studentId, String title,
+                //          String description, double amount, int numberOfStudents, String status)
                 Proposal p = new Proposal(
                         id,
                         officer.getId(),
                         title.getText().trim(),
                         desc.getText().trim(),
-                        perStudent,
+                        total,          // TOTAL amount now
                         students,
                         "Pending"
                 );
 
                 LocalDatabase.addProposal(p);
-                JOptionPane.showMessageDialog(this, "Proposal submitted (Pending).");
+                JOptionPane.showMessageDialog(this,
+                        "Proposal submitted (Pending).\nPer student: ₱"
+                                + String.format("%.2f", total / students));
                 loadProposals();
 
             } catch (NumberFormatException ex) {
@@ -130,10 +139,17 @@ public class OfficerFrame extends JFrame {
         StringBuilder sb = new StringBuilder();
         for (budgetsystem.model.Payment p : LocalDatabase.payments) {
             sb.append(String.format("%s | %s | %s | ₱%.2f | %s\n",
-                    p.getStudentName(), p.getStudentId(), p.getEventName(), p.getAmount(), p.getOfficerName()));
+                    p.getStudentName(),
+                    p.getStudentId(),
+                    p.getEventName(),
+                    p.getAmount(),
+                    p.getOfficerName()));
         }
         JTextArea ta = new JTextArea(sb.toString());
         ta.setEditable(false);
-        JOptionPane.showMessageDialog(this, new JScrollPane(ta), "All Payments", JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(this,
+                new JScrollPane(ta),
+                "All Payments",
+                JOptionPane.INFORMATION_MESSAGE);
     }
 }
