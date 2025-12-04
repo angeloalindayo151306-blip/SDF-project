@@ -1,0 +1,3 @@
+Payment,gwapo ko kaayu,12321,palaro,500.0,12321,2025-12-04
+Payment,gwapo ko kaayu,12321,ccs days,450.0,12321,2025-12-04
+Payment,gwapo ko kaayu,12321,ccs days,50.0,12321,2025-12-04

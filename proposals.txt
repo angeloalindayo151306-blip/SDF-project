@@ -1,0 +1,2 @@
+Proposal,85c87cca-dc5c-45ce-b4db-093667476dc0,12321,palaro,123,500.0,10,50.0,Approved
+Proposal,32f14381-1a88-4c2c-9997-0f97a0bef0f8,12321,ccs days,3123,500.0,10,50.0,Approved

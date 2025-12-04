@@ -2,6 +2,7 @@ package budgetsystem.gui;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import budgetsystem.model.*;
@@ -47,6 +48,11 @@ public class DeanFrame extends JFrame {
         table = new JTable(tableModel);
         table.setRowHeight(25);
         table.setAutoCreateRowSorter(true);
+
+        // Use a custom renderer so checkbox disappears when not Pending
+        table.getColumnModel().getColumn(0)
+             .setCellRenderer(new ApproveColumnRenderer());
+
         add(new JScrollPane(table), BorderLayout.CENTER);
 
         // BOTTOM BUTTONS
@@ -65,9 +71,52 @@ public class DeanFrame extends JFrame {
         approveBtn.addActionListener(e -> changeProposalStatus(true));
         rejectBtn.addActionListener(e -> changeProposalStatus(false));
         viewPayments.addActionListener(e -> showPaymentsTable());
-        logout.addActionListener(e -> { new WelcomeFrame().setVisible(true); dispose(); });
+        logout.addActionListener(e -> {
+            new WelcomeFrame().setVisible(true);
+            dispose();
+        });
 
         loadProposalsToTable();
+    }
+
+    // Renderer for the Approve column: show checkbox only when status is Pending
+    private class ApproveColumnRenderer extends JCheckBox implements TableCellRenderer {
+        private final JLabel empty = new JLabel();
+
+        ApproveColumnRenderer() {
+            setHorizontalAlignment(SwingConstants.CENTER);
+            empty.setOpaque(true);
+        }
+
+        @Override
+        public Component getTableCellRendererComponent(
+                JTable table, Object value, boolean isSelected,
+                boolean hasFocus, int row, int column) {
+
+            String status = (String) table.getValueAt(row, 4); // Status column
+
+            if ("Pending".equalsIgnoreCase(status)) {
+                setSelected(Boolean.TRUE.equals(value));
+                if (isSelected) {
+                    setBackground(table.getSelectionBackground());
+                    setForeground(table.getSelectionForeground());
+                } else {
+                    setBackground(table.getBackground());
+                    setForeground(table.getForeground());
+                }
+                return this;
+            } else {
+                empty.setText("");
+                if (isSelected) {
+                    empty.setBackground(table.getSelectionBackground());
+                    empty.setForeground(table.getSelectionForeground());
+                } else {
+                    empty.setBackground(table.getBackground());
+                    empty.setForeground(table.getForeground());
+                }
+                return empty;
+            }
+        }
     }
 
     // ===========================================================
@@ -81,7 +130,7 @@ public class DeanFrame extends JFrame {
             Object checkValue =
                     p.getStatus().equalsIgnoreCase("Pending")
                             ? Boolean.FALSE   // checkbox visible
-                            : null;           // hide checkbox
+                            : null;           // hidden by renderer
 
             tableModel.addRow(new Object[]{
                     checkValue,
@@ -134,13 +183,13 @@ public class DeanFrame extends JFrame {
     private void showPaymentsTable() {
 
         String[] cols = {
-            "Student Name",
-            "Year Level",
-            "Student ID",
-            "Event",
-            "Amount",
-            "Officer / Submitter",
-            "Date"
+                "Student Name",
+                "Year Level",
+                "Student ID",
+                "Event",
+                "Amount",
+                "Officer / Submitter",
+                "Date"
         };
 
         Object[][] data = new Object[LocalDatabase.payments.size()][7];
