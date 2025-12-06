@@ -1,3 +1,2 @@
-Payment,gwapo ko kaayu,13213,palaro,100.0,12323,2025-12-05
-Payment,gwapo ko kaayu,13213,ccs days,200.0,12323,2025-12-05
-Payment,gwapo ko kaayu,13213,year end,100.0,12323,2025-12-05
+Payment,oskar sda sda,asd,palaro,150.0,gwapo asd sdas,2025-12-07
+Payment,oskar1 sds asdas,weqwe,palaro,650.0,gwapo asd sdas,2025-12-07

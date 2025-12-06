@@ -63,6 +63,12 @@ public class Student extends User {
         );
     }
 
+    // For combo boxes etc.
+    @Override
+    public String toString() {
+        return getId() + " - " + getFullName();
+    }
+
     private static String escape(String s) {
         return (s == null ? "" : s.replace(",", "&#44;"));
     }

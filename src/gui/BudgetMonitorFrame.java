@@ -3,6 +3,7 @@ package budgetsystem.gui;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+
 import budgetsystem.model.Payment;
 import budgetsystem.model.Proposal;
 import budgetsystem.util.LocalDatabase;
@@ -66,7 +67,8 @@ public class BudgetMonitorFrame extends JFrame {
         for (Proposal p : LocalDatabase.proposals) {
             if (!p.getStatus().equalsIgnoreCase("Approved")) continue;
 
-            double allocated = p.getAmount();
+            // per-student required amount * number of students = event budget allocation
+            double allocated = p.getBudgetAllocation();
             double collected = 0;
 
             for (Payment pay : LocalDatabase.payments) {
@@ -77,7 +79,7 @@ public class BudgetMonitorFrame extends JFrame {
 
             double remaining = allocated - collected;
             String status;
-            if (remaining > 0.01)      status = "Underfunded";
+            if (remaining > 0.01)       status = "Underfunded";
             else if (remaining < -0.01) status = "Surplus";
             else                        status = "Balanced";
 

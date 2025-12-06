@@ -2,18 +2,21 @@ package budgetsystem.gui;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
-import javax.swing.table.TableCellRenderer;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
 
-import budgetsystem.model.*;
+import budgetsystem.model.Payment;
+import budgetsystem.model.Student;
+import budgetsystem.model.Proposal;
 import budgetsystem.util.LocalDatabase;
 
 public class StudentFrame extends JFrame {
-    private Student student;
-    private JTable table;
-    private DefaultTableModel model;
+    private final Student student;
+    private JTable tblPayments;
+    private DefaultTableModel tableModel;
+    private List<Payment> paymentsForStudent = new ArrayList<>();
+    private JLabel lblStatusSummary;   // shows PAID / PARTIAL + remaining categories
 
     public StudentFrame(Student s) {
         this.student = s;
@@ -24,289 +27,130 @@ public class StudentFrame extends JFrame {
         setResizable(true);
         setLayout(new BorderLayout());
 
-        JLabel header = new JLabel("Student Dashboard - " + s.getFullName(), SwingConstants.CENTER);
+        JLabel header = new JLabel("Student Dashboard - " + s.getFullName(),
+                                   SwingConstants.CENTER);
         header.setFont(new Font("Arial", Font.BOLD, 18));
         add(header, BorderLayout.NORTH);
 
-        // TABLE MODEL WITH CHECKBOX + STATUS
-        model = new DefaultTableModel(
-                new Object[]{"Pay", "ID", "Title", "Amount (Remaining)", "Status", "Submitter"}, 0
+        // Table model: read‑only
+        tableModel = new DefaultTableModel(
+                new Object[]{"Event", "Amount", "Officer", "Date"}, 0
         ) {
             @Override
-            public boolean isCellEditable(int r, int c) {
-                if (c != 0) return false;
-                return getValueAt(r, 0) instanceof Boolean;
-            }
-
-            @Override
-            public Class<?> getColumnClass(int columnIndex) {
-                return columnIndex == 0 ? Boolean.class : String.class;
+            public boolean isCellEditable(int row, int column) {
+                return false;   // STATIC: no editing
             }
         };
 
-        table = new JTable(model);
-        table.setRowHeight(25);
-        table.getColumnModel().getColumn(1).setPreferredWidth(60); // ID column
-        table.getColumnModel().getColumn(0)
-                .setCellRenderer(new PayColumnRenderer());
+        tblPayments = new JTable(tableModel);
+        tblPayments.setRowHeight(25);
+        tblPayments.setAutoCreateRowSorter(true);
+        add(new JScrollPane(tblPayments), BorderLayout.CENTER);
 
-        add(new JScrollPane(table), BorderLayout.CENTER);
+        // Bottom panel: status label + buttons
+        lblStatusSummary = new JLabel(" ");
+        lblStatusSummary.setHorizontalAlignment(SwingConstants.LEFT);
 
-        JPanel bottom = new JPanel();
-        JButton payBtn = new JButton("Pay Checked Events");
-        JButton historyBtn = new JButton("View Payment History");
-        JButton logout = new JButton("Logout");
+        JButton btnReceipt = new JButton("View Receipt");
+        JButton btnLogout  = new JButton("Logout");
 
-        bottom.add(payBtn);
-        bottom.add(historyBtn);
-        bottom.add(logout);
+        JPanel btnPanel = new JPanel();
+        btnPanel.add(btnReceipt);
+        btnPanel.add(btnLogout);
+
+        JPanel bottom = new JPanel(new BorderLayout(5, 5));
+        bottom.add(lblStatusSummary, BorderLayout.CENTER);
+        bottom.add(btnPanel, BorderLayout.EAST);
         add(bottom, BorderLayout.SOUTH);
 
-        payBtn.addActionListener(e -> paySelected());
-        historyBtn.addActionListener(e -> viewHistory());
-        logout.addActionListener(e -> {
+        btnReceipt.addActionListener(e -> showReceipt());
+        btnLogout.addActionListener(e -> {
             new WelcomeFrame().setVisible(true);
             dispose();
         });
 
-        loadApprovedEvents();
+        loadPayments();
     }
 
-    // ============== RENDERER: hides checkbox when null =================
-    private static class PayColumnRenderer extends JCheckBox implements TableCellRenderer {
-        private final JLabel empty = new JLabel();
-
-        PayColumnRenderer() {
-            setHorizontalAlignment(SwingConstants.CENTER);
-            empty.setOpaque(true);
-        }
-
-        @Override
-        public Component getTableCellRendererComponent(
-                JTable table, Object value, boolean isSelected,
-                boolean hasFocus, int row, int column) {
-
-            if (value instanceof Boolean) {
-                setSelected((Boolean) value);
-                if (isSelected) {
-                    setBackground(table.getSelectionBackground());
-                    setForeground(table.getSelectionForeground());
-                } else {
-                    setBackground(table.getBackground());
-                    setForeground(table.getForeground());
-                }
-                return this;
-            } else {
-                empty.setText("");
-                if (isSelected) {
-                    empty.setBackground(table.getSelectionBackground());
-                    empty.setForeground(table.getSelectionForeground());
-                } else {
-                    empty.setBackground(table.getBackground());
-                    empty.setForeground(table.getForeground());
-                }
-                return empty;
-            }
-        }
-    }
-
-    // ====================== HELPERS (per-student logic) =======================
-
-    // Per-student share for this proposal = total / numberOfStudents
-    private double getPerStudentAmount(Proposal proposal) {
-        int n = proposal.getNumberOfStudents();
-        if (n <= 0) return proposal.getAmount();  // fallback
-        return proposal.getAmount() / n;
-    }
-
-    // total paid by THIS student for this proposal
-    private double getTotalPaidForProposal(Proposal proposal) {
-        double totalPaid = 0.0;
-        for (Payment pay : LocalDatabase.payments) {
-            if (pay.getStudentId().equals(student.getId())
-                    && pay.getEventName().equals(proposal.getTitle())) {
-                totalPaid += pay.getAmount();
-            }
-        }
-        return totalPaid;
-    }
-
-    // remaining balance for THIS student = per-student - totalPaid
-    private double getRemainingForProposal(Proposal proposal) {
-        double remaining = getPerStudentAmount(proposal) - getTotalPaidForProposal(proposal);
-        return remaining < 0 ? 0.0 : remaining;
-    }
-
-    private boolean isFullyPaidByStudent(Proposal proposal) {
-        return getRemainingForProposal(proposal) <= 1e-6;
-    }
-
-    private String getPaymentStatus(Proposal proposal) {
-        double perStudent = getPerStudentAmount(proposal);
-        double totalPaid = getTotalPaidForProposal(proposal);
-
-        if (totalPaid <= 1e-6) {
-            return "Unpaid";
-        } else if (totalPaid + 1e-6 >= perStudent) {
-            return "Paid in Full";
-        } else {
-            return String.format("Partial (₱%.2f / ₱%.2f)", totalPaid, perStudent);
-        }
-    }
-
-    // ====================== LOAD APPROVED EVENTS ============================
-    private void loadApprovedEvents() {
-        model.setRowCount(0);
-
-        for (Proposal p : LocalDatabase.proposals) {
-            if (!p.getStatus().equalsIgnoreCase("Approved")) continue;
-
-            boolean fullyPaid = isFullyPaidByStudent(p);
-            Object payCell = fullyPaid ? null : Boolean.FALSE;
-            String status = getPaymentStatus(p);
-            double remaining = getRemainingForProposal(p); // per-student remaining
-
-            model.addRow(new Object[]{
-                    payCell,
-                    p.getProposalId(),
-                    p.getTitle(),
-                    "₱" + String.format("%.2f", remaining),
-                    status,
-                    p.getStudentId()
-            });
-        }
-    }
-
-    // ===================== PAY ALL CHECKED EVENTS ======================
-    private void paySelected() {
-        List<Integer> checkedRows = new ArrayList<>();
-
-        for (int i = 0; i < model.getRowCount(); i++) {
-            Object v = model.getValueAt(i, 0);
-            if (v instanceof Boolean && (Boolean) v) {
-                checkedRows.add(i);
-            }
-        }
-
-        if (checkedRows.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Check at least one event first.");
-            return;
-        }
-
-        int successCount = 0;
-        List<Payment> paymentsMade = new ArrayList<>();
-
-        for (int row : checkedRows) {
-            String proposalId = (String) model.getValueAt(row, 1); // ID column
-            Proposal chosen = null;
-
-            for (Proposal p : LocalDatabase.proposals) {
-                if (p.getProposalId().equals(proposalId)) {
-                    chosen = p;
-                    break;
-                }
-            }
-
-            if (chosen == null) continue;
-            if (isFullyPaidByStudent(chosen)) continue;
-
-            Payment payment = processPaymentForProposal(chosen);
-            if (payment != null) {
-                successCount++;
-                paymentsMade.add(payment);
-            }
-        }
-
-        if (successCount > 0) {
-            loadApprovedEvents(); // update remaining & status
-            new ReceiptFrame(paymentsMade).setVisible(true); // one receipt for all
-            JOptionPane.showMessageDialog(this,
-                    "Payments processed for " + successCount + " event(s).");
-        }
-    }
-
-    // Returns the Payment made, or null if cancelled/invalid
-    private Payment processPaymentForProposal(Proposal chosen) {
-        double remaining = getRemainingForProposal(chosen); // per-student remaining
-
-        if (remaining <= 1e-6) {
-            JOptionPane.showMessageDialog(this, "This event is already fully paid.");
-            return null;
-        }
-
-        Object[] options = {
-                "Pay Remaining (₱" + String.format("%.2f", remaining) + ")",
-                "Pay Partial",
-                "Cancel"
-        };
-
-        int option = JOptionPane.showOptionDialog(
-                this,
-                "Event: " + chosen.getTitle()
-                        + "\nPer-student total: ₱" + String.format("%.2f", getPerStudentAmount(chosen))
-                        + "\nRemaining balance: ₱" + String.format("%.2f", remaining),
-                "Payment",
-                JOptionPane.DEFAULT_OPTION,
-                JOptionPane.QUESTION_MESSAGE,
-                null, options, options[0]
-        );
-
-        if (option == JOptionPane.CLOSED_OPTION || option == 2) {
-            return null;
-        }
-
-        double payAmount;
-
-        if (option == 0) { // pay remaining
-            payAmount = remaining;
-        } else { // partial
-            String amt = JOptionPane.showInputDialog(
-                    this,
-                    "Enter amount for '" + chosen.getTitle()
-                            + "' (max ₱" + String.format("%.2f", remaining) + "):"
-            );
-            if (amt == null) return null;
-
-            try {
-                payAmount = Double.parseDouble(amt);
-                if (payAmount <= 0 || payAmount - remaining > 1e-6) {
-                    throw new Exception();
-                }
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this,
-                        "Invalid amount. It must be > 0 and ≤ remaining balance (₱"
-                                + String.format("%.2f", remaining) + ").");
-                return null;
-            }
-        }
-
-        Payment payment = new Payment(
-                student.getFullName(),
-                student.getId(),
-                chosen.getTitle(),
-                payAmount,
-                chosen.getStudentId()
-        );
-
-        LocalDatabase.addPayment(payment);
-        return payment;
-    }
-
-    // ======================= PAYMENT HISTORY ===========================
-    private void viewHistory() {
-        StringBuilder sb = new StringBuilder();
+    // Load this student's payments into the table
+    private void loadPayments() {
+        paymentsForStudent.clear();
+        tableModel.setRowCount(0);
 
         for (Payment p : LocalDatabase.payments) {
             if (p.getStudentId().equals(student.getId())) {
-                sb.append(String.format("%s | %s | ₱%.2f | %s\n",
-                        p.getEventName(), p.getDate(), p.getAmount(), p.getOfficerName()));
+                paymentsForStudent.add(p);
+                tableModel.addRow(new Object[]{
+                        p.getEventName(),
+                        String.format("₱%.2f", p.getAmount()),
+                        p.getOfficerName(),
+                        p.getDate().toString()
+                });
             }
         }
 
-        JTextArea area = new JTextArea(sb.toString());
-        area.setEditable(false);
+        updateStatusSummary();
+    }
 
-        JOptionPane.showMessageDialog(this, new JScrollPane(area),
-                "Payment History", JOptionPane.INFORMATION_MESSAGE);
+    // Compute if student is fully paid or partial and list remaining categories
+    private void updateStatusSummary() {
+        StringBuilder remainingSb = new StringBuilder();
+        boolean anyApproved = false;
+        boolean anyRemaining = false;
+
+        for (Proposal prop : LocalDatabase.proposals) {
+            if (!"Approved".equalsIgnoreCase(prop.getStatus())) continue;
+            anyApproved = true;
+
+            double required = prop.getAmount();
+            double paidTotal = 0.0;
+
+            for (Payment pay : LocalDatabase.payments) {
+                if (student.getId().equals(pay.getStudentId())
+                        && prop.getTitle().equalsIgnoreCase(pay.getEventName())) {
+                    paidTotal += pay.getAmount();
+                }
+            }
+
+            if (paidTotal + 1e-6 < required) {
+                anyRemaining = true;
+                double remaining = required - paidTotal;
+                if (remainingSb.length() > 0) remainingSb.append("; ");
+                remainingSb.append(prop.getTitle())
+                           .append(" (₱")
+                           .append(String.format("%.2f", remaining))
+                           .append(")");
+            }
+        }
+
+        if (!anyApproved) {
+            lblStatusSummary.setText("No approved events yet.");
+            return;
+        }
+
+        if (!anyRemaining) {
+            lblStatusSummary.setText("Status: PAID – all categories/events are fully paid.");
+        } else {
+            lblStatusSummary.setText(
+                    "<html>Status: PARTIAL – remaining: " + remainingSb + "</html>");
+        }
+    }
+
+    // Open receipt window for selected payment
+    private void showReceipt() {
+        int viewRow = tblPayments.getSelectedRow();
+        if (viewRow < 0) {
+            JOptionPane.showMessageDialog(this, "Please select a payment first.");
+            return;
+        }
+
+        int modelRow = tblPayments.convertRowIndexToModel(viewRow);
+        Payment selected = paymentsForStudent.get(modelRow);
+
+        // ReceiptFrame expects a List<Payment>
+        List<Payment> list = new ArrayList<>();
+        list.add(selected);
+
+        new ReceiptFrame(list).setVisible(true);
     }
 }

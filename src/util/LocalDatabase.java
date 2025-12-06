@@ -23,7 +23,7 @@ public class LocalDatabase {
     // 🔥 OPTION A: Delete ALL data files every time the program starts
     // ==========================================================
     static {
-        deleteAllFiles();  
+        deleteAllFiles();
         loadAll();
     }
 
@@ -170,5 +170,64 @@ public class LocalDatabase {
             if ("Approved".equalsIgnoreCase(p.getStatus())) out.add(p);
         }
         return out;
+    }
+
+    // ==========================================================
+    // Query helpers (for dashboards & reports)
+    // ==========================================================
+
+    public static List<Payment> getPayments() {
+        return new ArrayList<>(payments);
+    }
+
+    public static List<Student> getStudents() {
+        return new ArrayList<>(students);
+    }
+
+    public static Student findStudentById(String studentId) {
+        if (studentId == null) return null;
+        for (Student s : students) {
+            if (studentId.equals(s.getId())) {
+                return s;
+            }
+        }
+        return null;
+    }
+
+    public static List<Payment> getPaymentsByStudentId(String studentId) {
+        List<Payment> out = new ArrayList<>();
+        if (studentId == null) return out;
+        for (Payment p : payments) {
+            if (studentId.equals(p.getStudentId())) {
+                out.add(p);
+            }
+        }
+        return out;
+    }
+
+    public static double getPaidAmountByStudentAndEvent(String studentId, String eventName) {
+        double total = 0.0;
+        if (studentId == null || eventName == null) return total;
+        for (Payment p : payments) {
+            if (studentId.equals(p.getStudentId())
+                    && eventName.equalsIgnoreCase(p.getEventName())) {
+                total += p.getAmount();
+            }
+        }
+        return total;
+    }
+
+    public static List<Proposal> getProposals() {
+        return new ArrayList<>(proposals);
+    }
+
+    public static Proposal getLatestApprovedProposal() {
+        for (int i = proposals.size() - 1; i >= 0; i--) {
+            Proposal p = proposals.get(i);
+            if ("Approved".equalsIgnoreCase(p.getStatus())) {
+                return p;
+            }
+        }
+        return null;
     }
 }

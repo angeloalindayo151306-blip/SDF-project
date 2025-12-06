@@ -1,1 +1,2 @@
-Student,13213,gwapo,ko,kaayu,1996-10-16,29,gwapo,1234,BSIT,1st Year
+Student,asd,oskar,sda,sda,1996-10-16,29,oskar,1234,BSIT,1st Year
+Student,weqwe,oskar1,sds,asdas,1996-10-16,29,oskar1,1234,BSIT,1st Year
